@@ -60,7 +60,12 @@ def load_data():
 
 	return X_train, y_train, X_val, y_val, X_test
 
+
 def mConv(X, filters=8, neck=4, name='None'):
+	"""
+	Convolutional stack:
+		- bottle neck layer to reduce the numbers of parameters
+	"""
 	Conv1 = Conv2D(filters, (3,3), strides=1, padding='same', activation='relu', use_bias=True, kernel_initializer=glorot_uniform(), name=name+'_in')(X)
 	Conv2 = Conv2D(filters, (3,3), strides=1, padding='same', activation='relu', use_bias=True, kernel_initializer=glorot_uniform(), name=name+'_out')(Conv1)
 
@@ -68,7 +73,7 @@ def mConv(X, filters=8, neck=4, name='None'):
 	return Conv2, bottle_neck1
 
 
-def mnist_model2(input_shape=None, num_classes=10):
+def mnist_model(input_shape=None, num_classes=10):
 	X_input = Input(input_shape, name='Input')
 
 	X1, bn1 = mConv(X_input, 10, 5, 'Conv_1')
@@ -77,29 +82,7 @@ def mnist_model2(input_shape=None, num_classes=10):
 
 	X2, bn2 = mConv(bn1, 10, 5, 'Conv_2')
 
-	X3 = Concatenate(name='combine1')([X1, X2])
-	X3 = MaxPooling2D(2, padding='same')(X3)
-
-	bn3 = Conv2D(5, (1,1), strides=1, padding='valid', activation='relu', use_bias=True, kernel_initializer=glorot_uniform(), name='fneck')(X3)
-	X = Conv2D(10, (3,3), strides=1, padding='same', activation='relu', use_bias=True, kernel_initializer=glorot_uniform(), name='final')(bn3)
-	
-	X = Flatten()(X)
-	X = Dense(num_classes, activation='softmax')(X)
-
-	model = Model(inputs=X_input, outputs=X, name='mnist')
-
-
-	return model
-
-def mnist_model3(input_shape=None, num_classes=10):
-	X_input = Input(input_shape, name='Input')
-
-	X1, bn1 = mConv(X_input, 10, 5, 'Conv_1')
-	X1 = MaxPooling2D(2, padding='same')(X1)
-	bn1 = MaxPooling2D(2, padding='same')(bn1)
-
-	X2, bn2 = mConv(bn1, 10, 5, 'Conv_2')
-
+	# skip connection to allow gradient to flow more easily
 	X3 = Concatenate(name='combine1')([X1, X2])
 	X3 = MaxPooling2D(2, padding='same')(X3)
 
@@ -113,10 +96,16 @@ def mnist_model3(input_shape=None, num_classes=10):
 
 	model = Model(inputs=X_input, outputs=X, name='mnist')
 
-
 	return model
 
+
 def train(model, lr, epochs, batch_size, X, y, X_val=None, y_val=None, pre_weight=None, period=5):
+	"""
+		X, y: training data
+		X_val, y_val: validation data
+		pre_weight: path to your model's weight
+		period: interval between checkpoint
+	"""
 	model.compile(loss=keras.losses.categorical_crossentropy,
               optimizer=keras.optimizers.Adam(lr),
               metrics=['accuracy'])
@@ -153,6 +142,7 @@ def train(model, lr, epochs, batch_size, X, y, X_val=None, y_val=None, pre_weigh
 X_train, y_train, X_val, y_val, X_test = load_data()
 
 
-model = mnist_model3((28,28,1))
-model = train(model, 1e-3, 0, 32, X_train, y_train, pre_weight=os.path.join(MODEL, 'phase_2_weights.05-0.0945-0.9715.hdf5'))
+model = mnist_model((28,28,1))
+model = train(model, 1e-3, 0, 32, X_train, y_train)
 print(model.evaluate(X_val, y_val))
+# os.path.join(MODEL, 'phase_2_weights.05-0.0945-0.9715.hdf5')
